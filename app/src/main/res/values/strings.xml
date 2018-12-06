@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Electricity Assistant</string>
+    <string name="accessibility_service_description">自动统计电费</string>
+    <string name="accessibility_service_label">电费助手</string>
+</resources>
