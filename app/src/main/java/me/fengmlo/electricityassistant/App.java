@@ -1,24 +1,19 @@
 package me.fengmlo.electricityassistant;
 
 import android.app.Application;
-import android.arch.persistence.room.Room;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.util.Log;
 import com.orhanobut.logger.*;
+import me.fengmlo.AppExecutors;
 import me.fengmlo.electricityassistant.database.AppDatabase;
-
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 public class App extends Application {
 
     private static App app;
-    private static AppDatabase db;
-    private static ThreadPoolExecutor executor;
+    private static AppExecutors appExecutors;
 
     @Override
     public void onCreate() {
@@ -44,8 +39,7 @@ public class App extends Application {
 
         Logger.i("onCreate");
 
-        db = Room.databaseBuilder(this, AppDatabase.class, "electricity_fee").build();
-        executor = new ThreadPoolExecutor(4, 4, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(4));
+        appExecutors = new AppExecutors();
     }
 
     public static class LogCatStrategy implements LogStrategy {
@@ -68,12 +62,7 @@ public class App extends Application {
                 lastTime = SystemClock.uptimeMillis() + offset;
             }
             final long tmp = lastTime;
-            handler.postAtTime(new Runnable() {
-                @Override
-                public void run() {
-                    Log.println(priority, tag, message);
-                }
-            }, tmp);
+            handler.postAtTime(() -> Log.println(priority, tag, message), tmp);
 
         }
     }
@@ -83,10 +72,10 @@ public class App extends Application {
     }
 
     public static AppDatabase getDB() {
-        return db;
+        return AppDatabase.getInstance(app);
     }
 
     public static void run(Runnable runnable) {
-        executor.execute(runnable);
+        appExecutors.networkIO().execute(runnable);
     }
 }

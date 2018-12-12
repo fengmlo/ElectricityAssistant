@@ -7,6 +7,7 @@ import com.orhanobut.logger.Logger;
 import me.fengmlo.electricityassistant.database.dao.ElectricityFeeDao;
 import me.fengmlo.electricityassistant.database.entity.ElectricityFee;
 
+import java.math.BigDecimal;
 import java.util.Calendar;
 import java.util.List;
 
@@ -67,7 +68,7 @@ public class ElectricityAccessibilityService extends AccessibilityService {
                     final int month = calendar.get(Calendar.MONTH);
                     final int day = calendar.get(Calendar.DAY_OF_MONTH);
 
-                    ElectricityFee feeOfToday = dao.getElectricityFeeByDay(year, month, day);
+                    ElectricityFee feeOfToday = dao.getElectricityFeeByDaySync(year, month, day);
                     if (feeOfToday == null) {
                         ElectricityFee electricityFee = new ElectricityFee();
                         electricityFee.setYear(year);
@@ -75,10 +76,10 @@ public class ElectricityAccessibilityService extends AccessibilityService {
                         electricityFee.setDay(day);
                         electricityFee.setBalance(Double.parseDouble(money));
 
-                        ElectricityFee last = dao.getLastElectricityFee();
+                        ElectricityFee last = dao.getLastElectricityFeeSync();
                         if (last != null) {
                             electricityFee.setId(last.getId() + 1);
-                            electricityFee.setCost(last.getBalance() - electricityFee.getBalance());
+                            electricityFee.setCost(new BigDecimal(last.getBalance() - electricityFee.getBalance()).setScale(2, BigDecimal.ROUND_HALF_UP).doubleValue());
                         } else {
                             electricityFee.setId(1);
                             electricityFee.setCost(0);

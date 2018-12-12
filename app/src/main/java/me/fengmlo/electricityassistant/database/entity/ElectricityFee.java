@@ -5,7 +5,7 @@ import android.arch.persistence.room.Index;
 import android.arch.persistence.room.PrimaryKey;
 import org.jetbrains.annotations.NotNull;
 
-@Entity(tableName = "electricity_fee", indices = {@Index("year"), @Index(value = {"year", "month"}, unique = true), @Index(value = {"year", "month", "day"}, unique = true)})
+@Entity(tableName = "electricity_fee", indices = {@Index("year"), @Index(value = {"year", "month"}), @Index(value = {"year", "month", "day"})})
 public class ElectricityFee {
 
     @PrimaryKey

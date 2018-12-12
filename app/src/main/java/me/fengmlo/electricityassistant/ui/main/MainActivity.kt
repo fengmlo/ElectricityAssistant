@@ -1,27 +1,64 @@
-package me.fengmlo.electricityassistant
+package me.fengmlo.electricityassistant.ui.main
 
+import android.arch.lifecycle.Observer
+import android.arch.lifecycle.ViewModelProviders
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
 import android.provider.Settings
 import android.support.v7.app.AppCompatActivity
 import android.text.TextUtils
 import android.widget.Button
+import com.github.mikephil.charting.charts.LineChart
+import com.github.mikephil.charting.components.Legend
+import com.github.mikephil.charting.components.XAxis
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.LineData
+import com.github.mikephil.charting.data.LineDataSet
 import com.orhanobut.logger.Logger
+import me.fengmlo.electricityassistant.R
+import me.fengmlo.electricityassistant.bindView
 import me.fengmlo.electricityassistant.util.ToastUtil
 
-const val APP_PACKAGE_NAME = "com.sgcc.cs"//包名
+const val APP_PACKAGE_NAME = "com.sgcc.cs" // 包名
 
 class MainActivity : AppCompatActivity() {
 
+    private val lcMonth: LineChart by bindView(R.id.lc_month)
     private val btOpenApp: Button by bindView(R.id.bt_open_app)
+
+    private lateinit var model: MainViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         Logger.i("onCreate")
+
+        lcMonth.apply {
+            setBackgroundColor(Color.WHITE)
+            description.isEnabled = false
+            setTouchEnabled(true)
+            setDrawGridBackground(false)
+            isDragEnabled = true
+            setScaleEnabled(true)
+            setPinchZoom(true)
+            xAxis.apply {
+                enableGridDashedLine(10f, 10f, 0f)
+                position = XAxis.XAxisPosition.BOTTOM
+                axisMinimum = 0f
+                axisMaximum = 31f
+            }
+            axisLeft.apply {
+                enableGridDashedLine(10f, 10f, 0f)
+                axisMaximum = 200f
+                axisMinimum = 0f
+            }
+            axisRight.isEnabled = false
+            legend.form = Legend.LegendForm.LINE
+        }
 
         btOpenApp.setOnClickListener {
             if (isAppInstalled(this, APP_PACKAGE_NAME)) {
@@ -36,6 +73,13 @@ class MainActivity : AppCompatActivity() {
             openAccessibility(serviceName, this)
         }
 
+        model = ViewModelProviders.of(this).get(MainViewModel::class.java)
+        model.getElectricityFees().observe(this, Observer { list ->
+            if (list.isNullOrEmpty()) return@Observer
+            val dataSet = LineDataSet(list.map { Entry(it.day.toFloat(), it.cost.toFloat()) }, "月度用电情况")
+            lcMonth.data = LineData(dataSet)
+            lcMonth.invalidate()
+        })
 
     }
 
@@ -58,7 +102,7 @@ class MainActivity : AppCompatActivity() {
         if (accessibilityEnable == 1) {
             val mStringColonSplitter = TextUtils.SimpleStringSplitter(':')
             val settingValue =
-                    Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+                Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
             if (settingValue != null) {
                 mStringColonSplitter.setString(settingValue)
                 while (mStringColonSplitter.hasNext()) {
