@@ -12,6 +12,9 @@ public interface ElectricityFeeDao {
     @Query("SELECT * FROM ELECTRICITY_FEE")
     LiveData<List<ElectricityFee>> loadAll();
 
+    @Query("SELECT * FROM ELECTRICITY_FEE")
+    List<ElectricityFee> loadAllSync();
+
     @Query("SELECT * FROM ELECTRICITY_FEE WHERE year = :year")
     LiveData<List<ElectricityFee>> loadElectricityFeeByYear(int year);
 
@@ -26,6 +29,12 @@ public interface ElectricityFeeDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insert(ElectricityFee fee);
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void insertAll(List<ElectricityFee> fees);
+
+    @Update(onConflict = OnConflictStrategy.REPLACE)
+    void update(ElectricityFee fee);
 
     @Delete
     void delete(ElectricityFee fee);
