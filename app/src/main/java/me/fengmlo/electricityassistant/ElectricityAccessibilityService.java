@@ -1,15 +1,22 @@
 package me.fengmlo.electricityassistant;
 
 import android.accessibilityservice.AccessibilityService;
+import android.support.annotation.Nullable;
+import android.text.TextUtils;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
-import com.orhanobut.logger.Logger;
-import me.fengmlo.electricityassistant.database.dao.ElectricityFeeDao;
-import me.fengmlo.electricityassistant.database.entity.ElectricityFee;
 
-import java.math.BigDecimal;
+import com.orhanobut.logger.Logger;
+
 import java.util.Calendar;
 import java.util.List;
+
+import me.fengmlo.electricityassistant.database.dao.ElectricityFeeDao;
+import me.fengmlo.electricityassistant.database.dao.RechargeDao;
+import me.fengmlo.electricityassistant.database.entity.ElectricityFee;
+import me.fengmlo.electricityassistant.database.entity.Recharge;
+import me.fengmlo.electricityassistant.event.BalanceEvent;
+import me.fengmlo.electricityassistant.event.RxBus;
 
 public class ElectricityAccessibilityService extends AccessibilityService {
 
@@ -55,46 +62,78 @@ public class ElectricityAccessibilityService extends AccessibilityService {
             }
         }
 
+//        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && "android.widget.TextView".contentEquals(event.getClassName())) {
         List<AccessibilityNodeInfo> nodeInfos = rootInActiveWindow.findAccessibilityNodeInfosByText("表内余额");
         for (AccessibilityNodeInfo nodeInfo : nodeInfos) {
             Logger.i(nodeInfo.toString());
             AccessibilityNodeInfo parent = nodeInfo.getParent();
             if (parent != null) {
                 String money = parent.getChild(0).getText().toString().replace("元", "");
-                App.run(() -> {
-                    Calendar calendar = Calendar.getInstance();
-                    final ElectricityFeeDao dao = App.getDB().getElectricityFeeDao();
-                    final int year = calendar.get(Calendar.YEAR);
-                    final int month = calendar.get(Calendar.MONTH);
-                    final int day = calendar.get(Calendar.DAY_OF_MONTH);
-
-                    ElectricityFee feeOfToday = dao.getElectricityFeeByDaySync(year, month, day);
-                    if (feeOfToday == null) {
-                        ElectricityFee electricityFee = new ElectricityFee();
-                        electricityFee.setYear(year);
-                        electricityFee.setMonth(month);
-                        electricityFee.setDay(day);
-                        electricityFee.setBalance(Double.parseDouble(money));
-
-                        ElectricityFee last = dao.getLastElectricityFeeSync();
-                        if (last != null) {
-                            electricityFee.setId(last.getId() + 1);
-                            electricityFee.setCost(new BigDecimal(last.getBalance() - electricityFee.getBalance()).setScale(2, BigDecimal.ROUND_HALF_UP).doubleValue());
-                        } else {
-                            electricityFee.setId(1);
-                            electricityFee.setCost(0);
-                        }
-                        Logger.i(electricityFee.toString());
-                        dao.insert(electricityFee);
-                    }
-                });
+                onCatchBalance(money);
             }
         }
+//        }
     }
 
     @Override
     public void onInterrupt() {
 
+    }
+
+    private void onCatchBalance(String balance) {
+        if (TextUtils.isEmpty(balance)) return;
+        App.run(() -> {
+            Calendar calendar = Calendar.getInstance();
+            final ElectricityFeeDao dao = App.getDB().getElectricityFeeDao();
+            final int year = calendar.get(Calendar.YEAR);
+            final int month = calendar.get(Calendar.MONTH);
+            final int day = calendar.get(Calendar.DAY_OF_MONTH);
+
+            ElectricityFee feeOfToday = dao.getElectricityFeeByDaySync(year, month, day);
+            if (feeOfToday == null) { // 今天还没有统计过余额
+                ElectricityFee electricityFee = new ElectricityFee();
+                electricityFee.setYear(year);
+                electricityFee.setMonth(month);
+                electricityFee.setDay(day);
+                electricityFee.setBalance(Double.parseDouble(balance));
+
+                ElectricityFee last = dao.getLastElectricityFeeSync();
+                if (last != null) {
+                    electricityFee.setId(last.getId() + 1);
+                    electricityFee.setCost(Util.roundDouble(last.getBalance() - electricityFee.getBalance()));
+                } else {
+                    electricityFee.setId(1);
+                    electricityFee.setCost(0);
+                }
+                Logger.i(electricityFee.toString());
+                dao.insert(electricityFee);
+                RxBus.getInstance().post(new BalanceEvent());
+            } else if (!balance.equals(Double.toString(feeOfToday.getBalance()))) { // 今天统计过余额，但是余额变动，可能是充值，或者中途某天忘记统计
+                double difference = Double.parseDouble(balance) - feeOfToday.getBalance();
+                if (difference > 0) { // 充值
+                    RechargeDao rechargeDao = App.getDB().getRechargeDao();
+                    Recharge lastRecharge = rechargeDao.getLastRechargeSync();
+                    if (lastRecharge == null || !(lastRecharge.getYear() == year && lastRecharge.getMonth() == month && lastRecharge.getDay() == day)) {
+                        Recharge newRecharge = new Recharge();
+                        newRecharge.setYear(year);
+                        newRecharge.setMonth(month);
+                        newRecharge.setDay(day);
+                        newRecharge.setCharge(Util.roundDouble(difference));
+                        if (lastRecharge == null) {
+                            newRecharge.setId(1);
+                        } else {
+                            newRecharge.setId(lastRecharge.getId() + 1);
+                        }
+                        rechargeDao.insert(newRecharge);
+                    }
+                } else { // 某一天忘记统计
+
+                }
+            }
+            feeOfToday.setBalance(Util.roundDouble(Double.parseDouble(balance)));
+            dao.update(feeOfToday);
+
+        });
     }
 
     private AccessibilityNodeInfo findPassword(AccessibilityNodeInfo nodeInfo) {
@@ -136,5 +175,12 @@ public class ElectricityAccessibilityService extends AccessibilityService {
                 displayNodeInfoInternal(child, paddingSize, ++multiple);
             }
         }
+    }
+
+    private Calendar yesterday(@Nullable Calendar calendar) {
+        Calendar result = Calendar.getInstance();
+        if (calendar != null) result.setTime(calendar.getTime());
+        result.add(Calendar.DAY_OF_MONTH, -1);
+        return result;
     }
 }

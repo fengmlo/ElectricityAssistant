@@ -8,9 +8,8 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import me.fengmlo.electricityassistant.App
 import me.fengmlo.electricityassistant.database.entity.ElectricityFee
-import java.io.File
-import java.io.OutputStream
-import java.io.PrintStream
+import me.fengmlo.electricityassistant.database.entity.Recharge
+import java.io.*
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -20,11 +19,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val output = File(Environment.getExternalStorageDirectory().path, "electricity_fee.json")
         val electricityFee = App.getDB().electricityFeeDao.loadAllSync()
         val jsonString = Gson().toJson(electricityFee)
+
+        val recharge = App.getDB().rechargeDao.loadAllSync()
+        val rechargeString = Gson().toJson(recharge)
+
         var outputStream: OutputStream? = null
         try {
             outputStream = output.outputStream()
             PrintStream(outputStream).apply {
                 println(jsonString)
+                println(rechargeString)
                 flush()
                 close()
             }
@@ -33,9 +37,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun importDatabase(jsonString: String) {
+    fun importDatabase(inputStream: InputStream) {
+        val reader = BufferedReader(InputStreamReader(inputStream))
         val electricityFee =
-            Gson().fromJson<List<ElectricityFee>>(jsonString, object : TypeToken<List<ElectricityFee>>() {}.type)
+                Gson().fromJson<List<ElectricityFee>>(reader.readLine(), object : TypeToken<List<ElectricityFee>>() {}.type)
+        val recharge =
+                Gson().fromJson<List<Recharge>>(reader.readLine(), object : TypeToken<List<Recharge>>() {}.type)
         App.getDB().electricityFeeDao.insertAll(electricityFee)
+        App.getDB().rechargeDao.insertAll(recharge)
     }
 }

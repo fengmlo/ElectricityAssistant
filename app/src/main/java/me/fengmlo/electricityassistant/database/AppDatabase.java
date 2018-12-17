@@ -2,15 +2,21 @@ package me.fengmlo.electricityassistant.database;
 
 import android.arch.lifecycle.LiveData;
 import android.arch.lifecycle.MutableLiveData;
+import android.arch.persistence.db.SupportSQLiteDatabase;
 import android.arch.persistence.room.Database;
 import android.arch.persistence.room.Room;
 import android.arch.persistence.room.RoomDatabase;
+import android.arch.persistence.room.migration.Migration;
 import android.content.Context;
+import android.support.annotation.NonNull;
 import android.support.annotation.VisibleForTesting;
-import me.fengmlo.electricityassistant.database.dao.ElectricityFeeDao;
-import me.fengmlo.electricityassistant.database.entity.ElectricityFee;
 
-@Database(entities = {ElectricityFee.class}, version = 1, exportSchema = false)
+import me.fengmlo.electricityassistant.database.dao.ElectricityFeeDao;
+import me.fengmlo.electricityassistant.database.dao.RechargeDao;
+import me.fengmlo.electricityassistant.database.entity.ElectricityFee;
+import me.fengmlo.electricityassistant.database.entity.Recharge;
+
+@Database(entities = {ElectricityFee.class, Recharge.class}, version = 2, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
 
     private static AppDatabase sInstance;
@@ -20,6 +26,8 @@ public abstract class AppDatabase extends RoomDatabase {
     public static final String DATABASE_NAME = "electricity_fee"/*"electricity-fee-db"*/;
 
     public abstract ElectricityFeeDao getElectricityFeeDao();
+
+    public abstract RechargeDao getRechargeDao();
 
     public static AppDatabase getInstance(final Context context) {
         if (sInstance == null) {
@@ -39,7 +47,9 @@ public abstract class AppDatabase extends RoomDatabase {
      * The SQLite database is only created when it's accessed for the first time.
      */
     private static AppDatabase buildDatabase(final Context appContext) {
-        return Room.databaseBuilder(appContext, AppDatabase.class, DATABASE_NAME).build();
+        return Room.databaseBuilder(appContext, AppDatabase.class, DATABASE_NAME)
+                .addMigrations(MIGRATION_1_2)
+                .build();
     }
 
     /**
@@ -58,4 +68,16 @@ public abstract class AppDatabase extends RoomDatabase {
     public LiveData<Boolean> getDatabaseCreated() {
         return mIsDatabaseCreated;
     }
+
+    private static final Migration MIGRATION_1_2 = new Migration(1, 2) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("CREATE TABLE recharge (" +
+                    "id INTEGER PRIMARY KEY NOT NULL, " +
+                    "charge REAL NOT NULL, " +
+                    "year INTEGER NOT NULL, " +
+                    "month INTEGER NOT NULL, " +
+                    "day INTEGER NOT NULL)");
+        }
+    };
 }

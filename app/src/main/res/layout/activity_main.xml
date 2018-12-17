@@ -7,10 +7,58 @@
     android:orientation="vertical"
     tools:context=".ui.main.MainActivity">
 
-    <com.github.mikephil.charting.charts.LineChart
-        android:id="@+id/lc_month"
+    <android.support.constraint.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="300dp" />
+        android:layout_height="300dp">
+
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/lc_month"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="1.0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="1.0" />
+
+        <TextView
+            android:id="@+id/tv_cost"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:textAllCaps="true"
+            android:textColor="#23A6DE"
+            android:textSize="18sp"
+            app:layout_constraintBaseline_toBaselineOf="@+id/textView"
+            app:layout_constraintEnd_toStartOf="@+id/textView"
+            tools:text="16.00" />
+
+        <TextView
+            android:id="@+id/textView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
+            android:text="元"
+            android:textColor="#878D92"
+            android:textSize="12sp"
+            app:layout_constraintEnd_toEndOf="@+id/lc_month"
+            app:layout_constraintTop_toTopOf="@+id/lc_month" />
+
+        <TextView
+            android:id="@+id/tv_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:textColor="#878D92"
+            android:textSize="12sp"
+            app:layout_constraintStart_toStartOf="@+id/lc_month"
+            app:layout_constraintTop_toTopOf="@+id/lc_month"
+            tools:text="11月10号" />
+
+    </android.support.constraint.ConstraintLayout>
 
     <LinearLayout
         android:layout_width="match_parent"

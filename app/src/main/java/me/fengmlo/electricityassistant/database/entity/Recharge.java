@@ -1,18 +1,17 @@
 package me.fengmlo.electricityassistant.database.entity;
 
 import android.arch.persistence.room.Entity;
-import android.arch.persistence.room.Index;
 import android.arch.persistence.room.PrimaryKey;
 
 import org.jetbrains.annotations.NotNull;
 
-@Entity(tableName = "electricity_fee", indices = {@Index("year"), @Index(value = {"year", "month"}), @Index(value = {"year", "month", "day"})})
-public class ElectricityFee {
+@Entity(tableName = "recharge")
+public class Recharge {
 
     @PrimaryKey
     private int id;
 
-    private double balance;
+    private double charge;
 
     private int year;
 
@@ -20,14 +19,20 @@ public class ElectricityFee {
 
     private int day;
 
-    private double cost;
-
-    public double getBalance() {
-        return balance;
+    public int getId() {
+        return id;
     }
 
-    public void setBalance(double balance) {
-        this.balance = balance;
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public double getCharge() {
+        return charge;
+    }
+
+    public void setCharge(double charge) {
+        this.charge = charge;
     }
 
     public int getYear() {
@@ -54,32 +59,15 @@ public class ElectricityFee {
         this.day = day;
     }
 
-    public double getCost() {
-        return cost;
-    }
-
-    public void setCost(double cost) {
-        this.cost = cost;
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
     @NotNull
     @Override
     public String toString() {
-        return "ElectricityFee{" +
+        return "Recharge{" +
                 "id=" + id +
-                ", balance=" + balance +
+                ", charge=" + charge +
                 ", year=" + year +
                 ", month=" + month +
                 ", day=" + day +
-                ", cost=" + cost +
                 '}';
     }
 }
