@@ -200,7 +200,7 @@ class MainActivity : BaseActivity() {
         })
 
         val subscribe = RxBus.getInstance().toObservable(BalanceEvent::class.java)
-                .subscribeOn(AndroidSchedulers.mainThread())
+                .observeOn(AndroidSchedulers.mainThread())
                 .subscribe { showToast("电费记录成功，您现在可以关闭掌上电力了") }
         rxSubscriptionHelper.addSubscribe(subscribe)
     }
