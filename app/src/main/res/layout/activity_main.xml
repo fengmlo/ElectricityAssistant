@@ -4,17 +4,19 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@android:color/white"
     android:orientation="vertical"
     tools:context=".ui.main.MainActivity">
 
     <android.support.constraint.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="300dp">
+        android:layout_height="wrap_content">
 
         <com.github.mikephil.charting.charts.LineChart
             android:id="@+id/lc_month"
             android:layout_width="match_parent"
             android:layout_height="300dp"
+            android:layout_marginTop="16dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="1.0"
@@ -44,7 +46,7 @@
             android:textColor="#878D92"
             android:textSize="12sp"
             app:layout_constraintEnd_toEndOf="@+id/lc_month"
-            app:layout_constraintTop_toTopOf="@+id/lc_month" />
+            app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
             android:id="@+id/tv_date"
@@ -55,14 +57,34 @@
             android:textColor="#878D92"
             android:textSize="12sp"
             app:layout_constraintStart_toStartOf="@+id/lc_month"
-            app:layout_constraintTop_toTopOf="@+id/lc_month"
+            app:layout_constraintTop_toTopOf="parent"
             tools:text="11月10号" />
 
     </android.support.constraint.ConstraintLayout>
 
+    <com.flyco.tablayout.SegmentTabLayout
+        android:id="@+id/tl_segment"
+        android:layout_width="match_parent"
+        android:layout_height="26dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="20dp"
+        app:tl_bar_stroke_color="#CCCCCC"
+        app:tl_bar_stroke_width="1px"
+        app:tl_divider_color="#CCCCCC"
+        app:tl_divider_width="2px"
+        app:tl_indicator_color="#F2F2F2"
+        app:tl_indicator_corner_radius="2dp"
+        app:tl_tab_padding="20dp"
+        app:tl_textSelectColor="#000000"
+        app:tl_textUnselectColor="#999999"
+        app:tl_textsize="12dp" />
+
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:layout_marginTop="48dp">
 
         <Button
             android:id="@+id/bt_open_app"

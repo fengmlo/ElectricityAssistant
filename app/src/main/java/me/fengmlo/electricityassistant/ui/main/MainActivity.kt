@@ -13,6 +13,8 @@ import android.text.TextUtils
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
+import com.flyco.tablayout.SegmentTabLayout
+import com.flyco.tablayout.listener.OnTabSelectListener
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.Entry
@@ -36,7 +38,6 @@ import rx.Observable
 import rx.android.schedulers.AndroidSchedulers
 import rx.schedulers.Schedulers
 import java.io.InputStream
-import java.util.*
 
 const val APP_PACKAGE_NAME = "com.sgcc.cs" // 包名
 private const val FILE_SELECT_CODE = 1
@@ -49,17 +50,25 @@ class MainActivity : BaseActivity() {
     private val btImport: Button by bindView(R.id.bt_import)
     private val tvCost: TextView by bindView(R.id.tv_cost)
     private val tvDate: TextView by bindView(R.id.tv_date)
+    private val tlSegment: SegmentTabLayout by bindView(R.id.tl_segment)
 
     private lateinit var model: MainViewModel
     private val rxSubscriptionHelper = RxSubscriptionHelper()
     private var monthCost: Float = 0f
+    private var monthCostDataSet: LineDataSet? = null
+    private var monthBalanceDataSet: LineDataSet? = null
+    private var monthRechageDataSet: LineDataSet? = null
 
     override fun getLayoutId(): Int = R.layout.activity_main
 
     override fun initView() {
+        tlSegment.setTabData(arrayOf("本月电费", "电费余额"))
+        tlSegment.setOnTabSelectListener(object : OnTabSelectListener {
+            override fun onTabSelect(position: Int) = reloadData(position)
+            override fun onTabReselect(position: Int) {}
+        })
 
         lcMonth.apply {
-            setBackgroundColor(Color.WHITE)
             description.isEnabled = false
             setTouchEnabled(true)
             setDrawGridBackground(false)
@@ -67,8 +76,6 @@ class MainActivity : BaseActivity() {
             setScaleEnabled(false)
             xAxis.apply {
                 position = XAxis.XAxisPosition.BOTTOM
-                axisMinimum = 1f
-                axisMaximum = Calendar.getInstance().getActualMaximum(Calendar.DAY_OF_MONTH).toFloat()
                 setDrawGridLines(false)
                 textColor = 0xFFB2B2B2.toInt()
                 textSize = 8f
@@ -88,7 +95,10 @@ class MainActivity : BaseActivity() {
                         tvDate.visibility = View.VISIBLE
                         val data = it as ElectricityFee
                         tvDate.text = "${data.month}月${data.day}日"
-                        tvCost.text = data.cost.toString()
+                        when (tlSegment.currentTab) {
+                            0 -> tvCost.text = data.cost.toString()
+                            1 -> tvCost.text = data.balance.toString()
+                        }
                     } ?: kotlin.run {
                         tvDate.visibility = View.INVISIBLE
                     }
@@ -175,34 +185,46 @@ class MainActivity : BaseActivity() {
             if (list.isNullOrEmpty()) return@Observer
             monthCost = list.sumByDouble { it.cost }.toFloat()
             tvCost.text = monthCost.toString()
-            val dataSet = LineDataSet(list.map { Entry(it.day.toFloat(), it.cost.toFloat(), it) }, "月度用电情况").apply {
-                mode = LineDataSet.Mode.CUBIC_BEZIER
-                cubicIntensity = 0.2f
-//                setDrawCircles(false)
-                circleRadius = 3f
-                setCircleColor(Color.WHITE)
-                setDrawCircleHole(true)
-                circleHoleRadius = 2f
-                color = 0xFF23A6DE.toInt()
-                setCircleColorHole(color)
-                setDrawFilled(true)
-                fillDrawable = getDrawable(R.drawable.fade_blue)
-                setDrawHorizontalHighlightIndicator(false)
-                lineWidth = 2f
-                highlightLineWidth = 1f
-                highLightColor = color
-                setValueTextColors(arrayListOf(0xFF878D92.toInt()))
+            monthCostDataSet = LineDataSet(list.map { Entry(it.day.toFloat(), it.cost.toFloat(), it) }, null).apply {
+                initDataSetStyle()
             }
-            lcMonth.axisLeft.mAxisMaximum = list.maxBy { it.cost }!!.cost.toFloat() + 2f
-            lcMonth.axisLeft.mAxisMinimum =
-                    (list.minBy { it.cost }!!.cost.toFloat() - 2f).let { if (it < 0f) 0f else it }
-            lcMonth.data = LineData(dataSet)
+            monthBalanceDataSet = LineDataSet(list.map { Entry(it.day.toFloat(), it.balance.toFloat(), it) }, null).apply {
+                initDataSetStyle()
+            }
+            reloadData(tlSegment.currentTab)
         })
 
         val subscribe = RxBus.getInstance().toObservable(BalanceEvent::class.java)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe { showToast("电费记录成功，您现在可以关闭掌上电力了") }
         rxSubscriptionHelper.addSubscribe(subscribe)
+    }
+
+    private fun reloadData(tab: Int) {
+        when (tab) {
+            0 -> lcMonth.data = LineData(monthCostDataSet)
+            1 -> lcMonth.data = LineData(monthBalanceDataSet)
+        }
+        lcMonth.invalidate()
+        lcMonth.animateX(200)
+    }
+
+    private fun LineDataSet.initDataSetStyle() {
+        mode = LineDataSet.Mode.CUBIC_BEZIER
+        cubicIntensity = 0.2f
+        circleRadius = 3f
+        setCircleColor(Color.WHITE)
+        setDrawCircleHole(true)
+        circleHoleRadius = 2f
+        color = 0xFF23A6DE.toInt()
+        setCircleColorHole(color)
+        setDrawFilled(true)
+        fillDrawable = getDrawable(R.drawable.fade_blue)
+        setDrawHorizontalHighlightIndicator(false)
+        lineWidth = 2f
+        highlightLineWidth = 1f
+        highLightColor = color
+        setValueTextColors(arrayListOf(0xFF878D92.toInt()))
     }
 
     override fun onDestroy() {
