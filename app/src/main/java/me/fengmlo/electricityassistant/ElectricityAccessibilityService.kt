@@ -97,7 +97,7 @@ class ElectricityAccessibilityService : AccessibilityService() {
                     if (lastRecord.balance < parseBalance) { // 这段时间有充值
                         val rechargeDao = App.getDB().rechargeDao
                         val lastRecharge = rechargeDao.lastRechargeSync
-                        if (lastRecharge == null || !lastRecharge.inDate(lastRecord.getStartDate(), lastRecord.getEndDate())) {
+                        if (lastRecharge == null || !lastRecharge.inDate(lastRecord.getStartDate(), electricityFee.getEndDate())) {
                             RxBus.getInstance().post(UnrecordRechargeEvent())
                             return@run
                         } else {

@@ -9,9 +9,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.provider.Settings
+import android.support.design.widget.TextInputEditText
+import android.support.v7.app.AlertDialog
 import android.text.TextUtils
 import android.view.View
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import com.flyco.tablayout.SegmentTabLayout
 import com.flyco.tablayout.listener.OnTabSelectListener
@@ -178,12 +181,28 @@ class MainActivity : BaseActivity() {
         }
 
         btRecordCharge.setOnClickListener {
-            val subscribe = Observable.create<Unit> {
-                model.recordCharge(100.0)
-            }
-                    .compose(RxUtil.rxSchedulerHelper())
-                    .subscribe({ showToast("记录成功") }, { e -> e.printStackTrace() })
-            rxSubscriptionHelper.addSubscribe(subscribe)
+            val view = layoutInflater.inflate(R.layout.dialog_record_charge, LinearLayout(context), true)
+            val etCharge = view.findViewById<TextInputEditText>(R.id.et_charge)
+            AlertDialog.Builder(context)
+                    .setTitle("记录充值")
+                    .setView(view)
+                    .setPositiveButton("确定") { _, _ ->
+                        val string = etCharge.text.toString()
+                        if (string.isBlank()) {
+                            showToast("请输入充值金额")
+                            return@setPositiveButton
+                        }
+                        val money = string.toDouble()
+                        val subscribe = Observable.create<Unit> {
+                            it.onNext(model.recordCharge(money))
+                            it.onCompleted()
+                        }
+                                .compose(RxUtil.rxSchedulerHelper())
+                                .subscribe({ showToast("记录成功") }, { e -> e.printStackTrace() })
+                        rxSubscriptionHelper.addSubscribe(subscribe)
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
         }
 
         val serviceName = "me.fengmlo.electricityassistant.ElectricityAccessibilityService"
@@ -227,7 +246,7 @@ class MainActivity : BaseActivity() {
 
     private fun LineDataSet.initDataSetStyle() {
         mode = LineDataSet.Mode.CUBIC_BEZIER
-        cubicIntensity = 0.2f
+        cubicIntensity = 0.05f
         circleRadius = 3f
         setCircleColor(Color.WHITE)
         setDrawCircleHole(true)
