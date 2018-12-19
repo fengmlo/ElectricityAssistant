@@ -9,6 +9,7 @@ import me.fengmlo.electricityassistant.database.entity.ElectricityFee
 import me.fengmlo.electricityassistant.database.entity.Recharge
 import me.fengmlo.electricityassistant.event.BalanceEvent
 import me.fengmlo.electricityassistant.event.RxBus
+import me.fengmlo.electricityassistant.event.UnrecordRechargeEvent
 import me.fengmlo.electricityassistant.extension.*
 import java.util.*
 
@@ -92,6 +93,17 @@ class ElectricityAccessibilityService : AccessibilityService() {
 
                 val lastRecord = dao.lastElectricityFeeSync
                 if (lastRecord != null) { // 之前有统计过数据
+                    var chargeMoney = 0.0
+                    if (lastRecord.balance < parseBalance) { // 这段时间有充值
+                        val rechargeDao = App.getDB().rechargeDao
+                        val lastRecharge = rechargeDao.lastRechargeSync
+                        if (lastRecharge == null || !lastRecharge.inDate(lastRecord.getStartDate(), lastRecord.getEndDate())) {
+                            RxBus.getInstance().post(UnrecordRechargeEvent())
+                            return@run
+                        } else {
+                            chargeMoney = lastRecharge.charge
+                        }
+                    }
                     val yesterday = today.yesterday()
                     val yesterdayFee = dao.getElectricityFeeByDaySync(yesterday.year, yesterday.month, yesterday.day)
                     if (yesterdayFee == null) { // 昨天没有统计过数据，需要补数据
@@ -101,7 +113,7 @@ class ElectricityAccessibilityService : AccessibilityService() {
                             it.day = lastRecord.day
                         }
                         val days = today - lastRecordDay
-                        val averageCost = ((lastRecord.balance - electricityFee.balance) / days).roundHalfUp()
+                        val averageCost = ((lastRecord.balance + chargeMoney - electricityFee.balance) / days).roundHalfUp()
                         val temp = today.clone() as Calendar
                         for (i in 1 until days) { // 补数据
                             temp.add(Calendar.DAY_OF_YEAR, -1)
@@ -118,7 +130,7 @@ class ElectricityAccessibilityService : AccessibilityService() {
                         lastRecord.cost = averageCost
                     } else { // 昨天统计过数据
                         electricityFee.id = lastRecord.id + 1
-                        lastRecord.cost = (lastRecord.balance - electricityFee.balance).roundHalfUp()
+                        lastRecord.cost = (lastRecord.balance + chargeMoney - electricityFee.balance).roundHalfUp()
                     }
                     dao.update(lastRecord)
                 } else { // 第一次统计到数据
@@ -127,31 +139,11 @@ class ElectricityAccessibilityService : AccessibilityService() {
                 Logger.i(electricityFee.toString())
                 dao.insert(electricityFee)
                 RxBus.getInstance().post(BalanceEvent())
-            } else if (balance != java.lang.Double.toString(feeOfToday.balance)) { // 今天统计过余额，但是余额变动，可能是充值，或者中途某天忘记统计
-                val difference = parseBalance - feeOfToday.balance
-                if (difference > 0) { // 充值
-                    val rechargeDao = App.getDB().rechargeDao
-                    val lastRecharge = rechargeDao.lastRechargeSync
-                    if (lastRecharge == null || !(lastRecharge.year == year && lastRecharge.month == month && lastRecharge.day == day)) {
-                        val newRecharge = Recharge()
-                        newRecharge.year = year
-                        newRecharge.month = month
-                        newRecharge.day = day
-                        newRecharge.charge = Util.roundDouble(difference)
-                        if (lastRecharge == null) {
-                            newRecharge.id = 1
-                        } else {
-                            newRecharge.id = lastRecharge.id + 1
-                        }
-                        rechargeDao.insert(newRecharge)
-                    }
-                } else { // 某一天忘记统计
+            } else if (balance != java.lang.Double.toString(feeOfToday.balance)) { // 今天统计过余额，但是余额变动，可能是电力刷新时间有误
 
-                }
             }
             feeOfToday!!.balance = Util.roundDouble(parseBalance)
             dao.update(feeOfToday)
-
         }
     }
 
@@ -197,5 +189,37 @@ class ElectricityAccessibilityService : AccessibilityService() {
         if (calendar != null) result.time = calendar.time
         result.add(Calendar.DAY_OF_MONTH, -1)
         return result
+    }
+
+    private fun Recharge?.inDate(startDate: Calendar, endDate: Calendar): Boolean {
+        if (this == null) return false
+        val rechargeDate = Calendar.getInstance().also {
+            it.year = year
+            it.month = month
+            it.day = day
+        }
+        return !rechargeDate.before(startDate) && !rechargeDate.after(endDate)
+    }
+
+    private fun ElectricityFee.getStartDate(): Calendar {
+        return Calendar.getInstance().also {
+            it.year = year
+            it.month = month
+            it.day = day
+            it.hour = 0
+            it.minute = 0
+            it.second = 0
+        }
+    }
+
+    private fun ElectricityFee.getEndDate(): Calendar {
+        return Calendar.getInstance().also {
+            it.year = year
+            it.month = month
+            it.day = day
+            it.hour = 23
+            it.minute = 59
+            it.second = 59
+        }
     }
 }

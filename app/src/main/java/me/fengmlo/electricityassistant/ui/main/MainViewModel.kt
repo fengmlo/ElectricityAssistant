@@ -7,9 +7,14 @@ import android.os.Environment
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import me.fengmlo.electricityassistant.App
+import me.fengmlo.electricityassistant.Util
 import me.fengmlo.electricityassistant.database.entity.ElectricityFee
 import me.fengmlo.electricityassistant.database.entity.Recharge
+import me.fengmlo.electricityassistant.extension.day
+import me.fengmlo.electricityassistant.extension.month
+import me.fengmlo.electricityassistant.extension.year
 import java.io.*
+import java.util.*
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -45,5 +50,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 Gson().fromJson<List<Recharge>>(reader.readLine(), object : TypeToken<List<Recharge>>() {}.type)
         App.getDB().electricityFeeDao.insertAll(electricityFee)
         App.getDB().rechargeDao.insertAll(recharge)
+    }
+
+    fun recordCharge(money: Double) {
+        val today = Calendar.getInstance()
+        val rechargeDao = App.getDB().rechargeDao
+        val lastRecharge = rechargeDao.lastRechargeSync
+        val newRecharge = Recharge()
+        newRecharge.year = today.year
+        newRecharge.month = today.month
+        newRecharge.day = today.day
+        newRecharge.charge = Util.roundDouble(money)
+        if (lastRecharge == null) {
+            newRecharge.id = 1
+        } else {
+            newRecharge.id = lastRecharge.id + 1
+        }
+        rechargeDao.insert(newRecharge)
     }
 }

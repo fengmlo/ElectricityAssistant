@@ -32,6 +32,7 @@ import me.fengmlo.electricityassistant.bindView
 import me.fengmlo.electricityassistant.database.entity.ElectricityFee
 import me.fengmlo.electricityassistant.event.BalanceEvent
 import me.fengmlo.electricityassistant.event.RxBus
+import me.fengmlo.electricityassistant.event.UnrecordRechargeEvent
 import me.fengmlo.electricityassistant.extension.showToast
 import me.fengmlo.electricityassistant.util.ToastUtil
 import rx.Observable
@@ -48,6 +49,7 @@ class MainActivity : BaseActivity() {
     private val btOpenApp: Button by bindView(R.id.bt_open_app)
     private val btExport: Button by bindView(R.id.bt_export)
     private val btImport: Button by bindView(R.id.bt_import)
+    private val btRecordCharge: Button by bindView(R.id.bt_record_charge)
     private val tvCost: TextView by bindView(R.id.tv_cost)
     private val tvDate: TextView by bindView(R.id.tv_date)
     private val tlSegment: SegmentTabLayout by bindView(R.id.tl_segment)
@@ -175,6 +177,15 @@ class MainActivity : BaseActivity() {
             }
         }
 
+        btRecordCharge.setOnClickListener {
+            val subscribe = Observable.create<Unit> {
+                model.recordCharge(100.0)
+            }
+                    .compose(RxUtil.rxSchedulerHelper())
+                    .subscribe({ showToast("记录成功") }, { e -> e.printStackTrace() })
+            rxSubscriptionHelper.addSubscribe(subscribe)
+        }
+
         val serviceName = "me.fengmlo.electricityassistant.ElectricityAccessibilityService"
         if (!isAccessibilitySettingsOn(serviceName, this)) {
             openAccessibility(serviceName, this)
@@ -198,6 +209,11 @@ class MainActivity : BaseActivity() {
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe { showToast("电费记录成功，您现在可以关闭掌上电力了") }
         rxSubscriptionHelper.addSubscribe(subscribe)
+
+        val subscribe1 = RxBus.getInstance().toObservable(UnrecordRechargeEvent::class.java)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe { showToast("您忘了记录充值了") }
+        rxSubscriptionHelper.addSubscribe(subscribe1)
     }
 
     private fun reloadData(tab: Int) {

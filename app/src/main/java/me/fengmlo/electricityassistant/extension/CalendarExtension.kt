@@ -27,6 +27,24 @@ var Calendar.day
         set(Calendar.DAY_OF_MONTH, value)
     }
 
+var Calendar.hour
+    get() = get(Calendar.HOUR_OF_DAY)
+    set(value) {
+        set(Calendar.HOUR_OF_DAY, value)
+    }
+
+var Calendar.minute
+    get() = get(Calendar.MINUTE)
+    set(value) {
+        set(Calendar.MINUTE, value)
+    }
+
+var Calendar.second
+    get() = get(Calendar.SECOND)
+    set(value) {
+        set(Calendar.SECOND, value)
+    }
+
 operator fun Calendar.minus(other: Calendar): Int {
     var d1 = this.clone() as Calendar
     var d2 = other.clone() as Calendar
