@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:title="导入数据" android:id="@+id/item_import"/>
+    <item android:title="导出到外部存储" android:id="@+id/item_export"/>
+    <item android:title="记录充值" android:id="@+id/item_record_charge"/>
+</menu>

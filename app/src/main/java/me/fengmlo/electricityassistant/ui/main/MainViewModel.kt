@@ -18,7 +18,10 @@ import java.util.*
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
-    fun getElectricityFees(): LiveData<List<ElectricityFee>> = App.getDB().electricityFeeDao.loadAll()
+    fun getElectricityFees(): LiveData<List<ElectricityFee>> {
+        val today = Calendar.getInstance()
+        return App.getDB().electricityFeeDao.loadElectricityFeeByMonth(today.year, today.month)
+    }
 
     fun exportDatabase() {
         val output = File(Environment.getExternalStorageDirectory().path, "electricity_fee.json")

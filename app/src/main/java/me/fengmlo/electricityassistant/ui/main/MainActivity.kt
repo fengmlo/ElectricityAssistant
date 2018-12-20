@@ -12,6 +12,8 @@ import android.provider.Settings
 import android.support.design.widget.TextInputEditText
 import android.support.v7.app.AlertDialog
 import android.text.TextUtils
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
@@ -50,9 +52,6 @@ class MainActivity : BaseActivity() {
 
     private val lcMonth: LineChart by bindView(R.id.lc_month)
     private val btOpenApp: Button by bindView(R.id.bt_open_app)
-    private val btExport: Button by bindView(R.id.bt_export)
-    private val btImport: Button by bindView(R.id.bt_import)
-    private val btRecordCharge: Button by bindView(R.id.bt_record_charge)
     private val tvCost: TextView by bindView(R.id.tv_cost)
     private val tvDate: TextView by bindView(R.id.tv_date)
     private val tlSegment: SegmentTabLayout by bindView(R.id.tl_segment)
@@ -120,91 +119,6 @@ class MainActivity : BaseActivity() {
             }
         }
 
-        btExport.setOnClickListener { v ->
-            val subscribe = RxPermissions(context)
-                    .request(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    .observeOn(Schedulers.io())
-                    .flatMap { granted ->
-                        if (granted) {
-                            Observable.create<Unit> {
-                                it.onNext(model.exportDatabase())
-                                it.onCompleted()
-                            }
-                        } else {
-                            Observable.error<Unit>(Throwable(""))
-                        }
-                    }
-                    .compose(RxUtil.rxSchedulerHelper())
-                    .doOnSubscribe { showToast("正在保存到外部存储根目录") }
-                    .subscribe({ showToast("数据已保存到外部存储根目录，文件名：electricity_fee.json") }, { e ->
-                        e.printStackTrace()
-                        showToast("保存失败")
-                    })
-            rxSubscriptionHelper.addSubscribe(subscribe)
-        }
-
-        btImport.setOnClickListener {
-            val intent = Intent(Intent.ACTION_GET_CONTENT)
-            intent.type = "*/*"
-            intent.addCategory(Intent.CATEGORY_OPENABLE)
-            if (intent.resolveActivity(packageManager) != null) {
-                startActivityForResult(
-                        Intent.createChooser(intent, "Select a File to Upload"),
-                        FILE_SELECT_CODE
-                ) { resultCode, data ->
-                    if (resultCode == Activity.RESULT_OK) {
-                        val uri = data?.data
-                        if (uri == null) {
-                            showToast("无法打开文件")
-                            return@startActivityForResult
-                        }
-                        val subscribe = Observable.create<Unit> {
-                            var inputStream: InputStream? = null
-                            try {
-                                inputStream = contentResolver.openInputStream(uri)
-                                it.onNext(model.importDatabase(inputStream))
-                                it.onCompleted()
-                            } finally {
-                                inputStream?.close()
-                            }
-                        }
-                                .compose(RxUtil.rxSchedulerHelper())
-                                .doOnSubscribe { showToast("正在导入电费数据") }
-                                .subscribe({ showToast("数据导入成功") }, { e ->
-                                    e.printStackTrace()
-                                    showToast("文件导入失败")
-                                })
-                        rxSubscriptionHelper.addSubscribe(subscribe)
-                    }
-                }
-            }
-        }
-
-        btRecordCharge.setOnClickListener {
-            val view = layoutInflater.inflate(R.layout.dialog_record_charge, LinearLayout(context), true)
-            val etCharge = view.findViewById<TextInputEditText>(R.id.et_charge)
-            AlertDialog.Builder(context)
-                    .setTitle("记录充值")
-                    .setView(view)
-                    .setPositiveButton("确定") { _, _ ->
-                        val string = etCharge.text.toString()
-                        if (string.isBlank()) {
-                            showToast("请输入充值金额")
-                            return@setPositiveButton
-                        }
-                        val money = string.toDouble()
-                        val subscribe = Observable.create<Unit> {
-                            it.onNext(model.recordCharge(money))
-                            it.onCompleted()
-                        }
-                                .compose(RxUtil.rxSchedulerHelper())
-                                .subscribe({ showToast("记录成功") }, { e -> e.printStackTrace() })
-                        rxSubscriptionHelper.addSubscribe(subscribe)
-                    }
-                    .setNegativeButton("取消", null)
-                    .show()
-        }
-
         val serviceName = "me.fengmlo.electricityassistant.ElectricityAccessibilityService"
         if (!isAccessibilitySettingsOn(serviceName, this)) {
             openAccessibility(serviceName, this)
@@ -215,12 +129,16 @@ class MainActivity : BaseActivity() {
             if (list.isNullOrEmpty()) return@Observer
             monthCost = list.sumByDouble { it.cost }.toFloat()
             tvCost.text = monthCost.toString()
-            monthCostDataSet = LineDataSet(list.map { Entry(it.day.toFloat(), it.cost.toFloat(), it) }, null).apply {
-                initDataSetStyle()
-            }
-            monthBalanceDataSet = LineDataSet(list.map { Entry(it.day.toFloat(), it.balance.toFloat(), it) }, null).apply {
-                initDataSetStyle()
-            }
+            monthCostDataSet =
+                    LineDataSet(list.filter { it.cost > 0 }.map { Entry(it.day.toFloat(), it.cost.toFloat(), it) },
+                            null
+                    ).apply {
+                        initDataSetStyle()
+                    }
+            monthBalanceDataSet =
+                    LineDataSet(list.map { Entry(it.day.toFloat(), it.balance.toFloat(), it) }, null).apply {
+                        initDataSetStyle()
+                    }
             reloadData(tlSegment.currentTab)
         })
 
@@ -233,6 +151,107 @@ class MainActivity : BaseActivity() {
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe { showToast("您忘了记录充值了") }
         rxSubscriptionHelper.addSubscribe(subscribe1)
+    }
+
+    override fun onDestroy() {
+        rxSubscriptionHelper.unSubscribe()
+        super.onDestroy()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.item_import -> {
+                val intent = Intent(Intent.ACTION_GET_CONTENT)
+                intent.type = "*/*"
+                intent.addCategory(Intent.CATEGORY_OPENABLE)
+                if (intent.resolveActivity(packageManager) != null) {
+                    startActivityForResult(
+                            Intent.createChooser(intent, "Select a File to Upload"),
+                            FILE_SELECT_CODE
+                    ) { resultCode, data ->
+                        if (resultCode == Activity.RESULT_OK) {
+                            val uri = data?.data
+                            if (uri == null) {
+                                showToast("无法打开文件")
+                                return@startActivityForResult
+                            }
+                            val subscribe = Observable.create<Unit> {
+                                var inputStream: InputStream? = null
+                                try {
+                                    inputStream = contentResolver.openInputStream(uri)
+                                    it.onNext(model.importDatabase(inputStream))
+                                    it.onCompleted()
+                                } finally {
+                                    inputStream?.close()
+                                }
+                            }
+                                    .compose(RxUtil.rxSchedulerHelper())
+                                    .doOnSubscribe { showToast("正在导入电费数据") }
+                                    .subscribe({ showToast("数据导入成功") }, { e ->
+                                        e.printStackTrace()
+                                        showToast("文件导入失败")
+                                    })
+                            rxSubscriptionHelper.addSubscribe(subscribe)
+                        }
+                    }
+                }
+                true
+            }
+            R.id.item_export -> {
+                val subscribe = RxPermissions(context)
+                        .request(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        .observeOn(Schedulers.io())
+                        .flatMap { granted ->
+                            if (granted) {
+                                Observable.create<Unit> {
+                                    it.onNext(model.exportDatabase())
+                                    it.onCompleted()
+                                }
+                            } else {
+                                Observable.error<Unit>(Throwable(""))
+                            }
+                        }
+                        .compose(RxUtil.rxSchedulerHelper())
+                        .doOnSubscribe { showToast("正在保存到外部存储根目录") }
+                        .subscribe({ showToast("数据已保存到外部存储根目录，文件名：electricity_fee.json") }, { e ->
+                            e.printStackTrace()
+                            showToast("保存失败")
+                        })
+                rxSubscriptionHelper.addSubscribe(subscribe)
+                true
+            }
+            R.id.item_record_charge -> {
+                val view = layoutInflater.inflate(R.layout.dialog_record_charge, LinearLayout(context), true)
+                val etCharge = view.findViewById<TextInputEditText>(R.id.et_charge)
+                AlertDialog.Builder(context)
+                        .setTitle("记录充值")
+                        .setView(view)
+                        .setPositiveButton("确定") { _, _ ->
+                            val string = etCharge.text.toString()
+                            if (string.isBlank()) {
+                                showToast("请输入充值金额")
+                                return@setPositiveButton
+                            }
+                            val money = string.toDouble()
+                            val subscribe = Observable.create<Unit> {
+                                it.onNext(model.recordCharge(money))
+                                it.onCompleted()
+                            }
+                                    .compose(RxUtil.rxSchedulerHelper())
+                                    .subscribe({ showToast("记录成功") }, { e -> e.printStackTrace() })
+                            rxSubscriptionHelper.addSubscribe(subscribe)
+                        }
+                        .setNegativeButton("取消", null)
+                        .show()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 
     private fun reloadData(tab: Int) {
@@ -262,11 +281,6 @@ class MainActivity : BaseActivity() {
         setValueTextColors(arrayListOf(0xFF878D92.toInt()))
     }
 
-    override fun onDestroy() {
-        rxSubscriptionHelper.unSubscribe()
-        super.onDestroy()
-    }
-
     /**
      * 该辅助功能开关是否打开了
      *
@@ -278,14 +292,16 @@ class MainActivity : BaseActivity() {
         var accessibilityEnable = 0
         val serviceName = context.packageName + "/" + accessibilityServiceName
         try {
-            accessibilityEnable = Settings.Secure.getInt(context.contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED, 0)
+            accessibilityEnable =
+                    Settings.Secure.getInt(context.contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED, 0)
         } catch (e: Exception) {
             Logger.e("get accessibility enable failed, the err:" + e.message)
         }
 
         if (accessibilityEnable == 1) {
             val mStringColonSplitter = TextUtils.SimpleStringSplitter(':')
-            val settingValue = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+            val settingValue =
+                    Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
             if (settingValue != null) {
                 mStringColonSplitter.setString(settingValue)
                 while (mStringColonSplitter.hasNext()) {
