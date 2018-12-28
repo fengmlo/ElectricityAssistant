@@ -98,7 +98,7 @@ class MainActivity : BaseActivity() {
                     e?.data?.let {
                         tvDate.visibility = View.VISIBLE
                         val data = it as ElectricityFee
-                        tvDate.text = "${data.month}月${data.day}日"
+                        tvDate.text = "${data.month + 1}月${data.day}日"
                         when (tlSegment.currentTab) {
                             0 -> tvCost.text = data.cost.toString()
                             1 -> tvCost.text = data.balance.toString()
