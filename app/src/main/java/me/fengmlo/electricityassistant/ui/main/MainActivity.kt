@@ -39,6 +39,7 @@ import me.fengmlo.electricityassistant.event.BalanceEvent
 import me.fengmlo.electricityassistant.event.RxBus
 import me.fengmlo.electricityassistant.event.UnrecordRechargeEvent
 import me.fengmlo.electricityassistant.extension.showToast
+import me.fengmlo.electricityassistant.ui.applist.AppListActivity
 import me.fengmlo.electricityassistant.util.ToastUtil
 import rx.Observable
 import rx.android.schedulers.AndroidSchedulers
@@ -126,15 +127,17 @@ class MainActivity : BaseActivity() {
 
         model = ViewModelProviders.of(this).get(MainViewModel::class.java)
         model.getElectricityFees().observe(this, Observer { list ->
-            if (list.isNullOrEmpty()) return@Observer
+            if (list.isNullOrEmpty()) {
+                loadEmptyData()
+                return@Observer
+            }
             monthCost = list.sumByDouble { it.cost }.toFloat()
             tvCost.text = monthCost.toString()
-            monthCostDataSet =
-                    LineDataSet(list.filter { it.cost > 0 }.map { Entry(it.day.toFloat(), it.cost.toFloat(), it) },
-                            null
-                    ).apply {
-                        initDataSetStyle()
-                    }
+            val costList = list.let { if (it.isNotEmpty()) it else it.filter { it.cost > 0 } }
+            monthCostDataSet = LineDataSet(
+                costList.map { Entry(it.day.toFloat(), it.cost.toFloat(), it) },
+                null
+            ).apply { initDataSetStyle() }
             monthBalanceDataSet =
                     LineDataSet(list.map { Entry(it.day.toFloat(), it.balance.toFloat(), it) }, null).apply {
                         initDataSetStyle()
@@ -143,13 +146,13 @@ class MainActivity : BaseActivity() {
         })
 
         val subscribe = RxBus.getInstance().toObservable(BalanceEvent::class.java)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe { showToast("电费记录成功，您现在可以关闭掌上电力了") }
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe { showToast("电费记录成功，您现在可以关闭掌上电力了") }
         rxSubscriptionHelper.addSubscribe(subscribe)
 
         val subscribe1 = RxBus.getInstance().toObservable(UnrecordRechargeEvent::class.java)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe { showToast("您忘了记录充值了") }
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe { showToast("您忘了记录充值了") }
         rxSubscriptionHelper.addSubscribe(subscribe1)
     }
 
@@ -171,8 +174,8 @@ class MainActivity : BaseActivity() {
                 intent.addCategory(Intent.CATEGORY_OPENABLE)
                 if (intent.resolveActivity(packageManager) != null) {
                     startActivityForResult(
-                            Intent.createChooser(intent, "Select a File to Upload"),
-                            FILE_SELECT_CODE
+                        Intent.createChooser(intent, "Select a File to Upload"),
+                        FILE_SELECT_CODE
                     ) { resultCode, data ->
                         if (resultCode == Activity.RESULT_OK) {
                             val uri = data?.data
@@ -190,12 +193,12 @@ class MainActivity : BaseActivity() {
                                     inputStream?.close()
                                 }
                             }
-                                    .compose(RxUtil.rxSchedulerHelper())
-                                    .doOnSubscribe { showToast("正在导入电费数据") }
-                                    .subscribe({ showToast("数据导入成功") }, { e ->
-                                        e.printStackTrace()
-                                        showToast("文件导入失败")
-                                    })
+                                .compose(RxUtil.rxSchedulerHelper())
+                                .doOnSubscribe { showToast("正在导入电费数据") }
+                                .subscribe({ showToast("数据导入成功") }, { e ->
+                                    e.printStackTrace()
+                                    showToast("文件导入失败")
+                                })
                             rxSubscriptionHelper.addSubscribe(subscribe)
                         }
                     }
@@ -204,24 +207,24 @@ class MainActivity : BaseActivity() {
             }
             R.id.item_export -> {
                 val subscribe = RxPermissions(context)
-                        .request(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                        .observeOn(Schedulers.io())
-                        .flatMap { granted ->
-                            if (granted) {
-                                Observable.create<Unit> {
-                                    it.onNext(model.exportDatabase())
-                                    it.onCompleted()
-                                }
-                            } else {
-                                Observable.error<Unit>(Throwable(""))
+                    .request(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    .observeOn(Schedulers.io())
+                    .flatMap { granted ->
+                        if (granted) {
+                            Observable.create<Unit> {
+                                it.onNext(model.exportDatabase())
+                                it.onCompleted()
                             }
+                        } else {
+                            Observable.error<Unit>(Throwable(""))
                         }
-                        .compose(RxUtil.rxSchedulerHelper())
-                        .doOnSubscribe { showToast("正在保存到外部存储根目录") }
-                        .subscribe({ showToast("数据已保存到外部存储根目录，文件名：electricity_fee.json") }, { e ->
-                            e.printStackTrace()
-                            showToast("保存失败")
-                        })
+                    }
+                    .compose(RxUtil.rxSchedulerHelper())
+                    .doOnSubscribe { showToast("正在保存到外部存储根目录") }
+                    .subscribe({ showToast("数据已保存到外部存储根目录，文件名：electricity_fee.json") }, { e ->
+                        e.printStackTrace()
+                        showToast("保存失败")
+                    })
                 rxSubscriptionHelper.addSubscribe(subscribe)
                 true
             }
@@ -229,29 +232,39 @@ class MainActivity : BaseActivity() {
                 val view = layoutInflater.inflate(R.layout.dialog_record_charge, LinearLayout(context), true)
                 val etCharge = view.findViewById<TextInputEditText>(R.id.et_charge)
                 AlertDialog.Builder(context)
-                        .setTitle("记录充值")
-                        .setView(view)
-                        .setPositiveButton("确定") { _, _ ->
-                            val string = etCharge.text.toString()
-                            if (string.isBlank()) {
-                                showToast("请输入充值金额")
-                                return@setPositiveButton
-                            }
-                            val money = string.toDouble()
-                            val subscribe = Observable.create<Unit> {
-                                it.onNext(model.recordCharge(money))
-                                it.onCompleted()
-                            }
-                                    .compose(RxUtil.rxSchedulerHelper())
-                                    .subscribe({ showToast("记录成功") }, { e -> e.printStackTrace() })
-                            rxSubscriptionHelper.addSubscribe(subscribe)
+                    .setTitle("记录充值")
+                    .setView(view)
+                    .setPositiveButton("确定") { _, _ ->
+                        val string = etCharge.text.toString()
+                        if (string.isBlank()) {
+                            showToast("请输入充值金额")
+                            return@setPositiveButton
                         }
-                        .setNegativeButton("取消", null)
-                        .show()
+                        val money = string.toDouble()
+                        val subscribe = Observable.create<Unit> {
+                            it.onNext(model.recordCharge(money))
+                            it.onCompleted()
+                        }
+                            .compose(RxUtil.rxSchedulerHelper())
+                            .subscribe({ showToast("记录成功") }, { e -> e.printStackTrace() })
+                        rxSubscriptionHelper.addSubscribe(subscribe)
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
+                true
+            }
+            R.id.item_app_list -> {
+                AppListActivity.start(this)
                 true
             }
             else -> super.onOptionsItemSelected(item)
         }
+    }
+
+    private fun loadEmptyData() {
+        monthCostDataSet = LineDataSet(arrayListOf(Entry(0f, 0f)), null).apply { initDataSetStyle() }
+        monthBalanceDataSet = LineDataSet(arrayListOf(Entry(0f, 0f)), null).apply { initDataSetStyle() }
+        reloadData(tlSegment.currentTab)
     }
 
     private fun reloadData(tab: Int) {
@@ -301,7 +314,7 @@ class MainActivity : BaseActivity() {
         if (accessibilityEnable == 1) {
             val mStringColonSplitter = TextUtils.SimpleStringSplitter(':')
             val settingValue =
-                    Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+                Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
             if (settingValue != null) {
                 mStringColonSplitter.setString(settingValue)
                 while (mStringColonSplitter.hasNext()) {

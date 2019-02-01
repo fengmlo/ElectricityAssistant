@@ -75,75 +75,83 @@ class ElectricityAccessibilityService : AccessibilityService() {
         App.run {
             val parseBalance: Double = balance.toDoubleOrNull() ?: return@run
 
-            val today = Calendar.getInstance()
-            if (today.get(Calendar.HOUR_OF_DAY) < 7) return@run  // 7点之前数据可能没有刷新，不统计
-            val year = today.get(Calendar.YEAR)
-            val month = today.get(Calendar.MONTH)
-            val day = today.get(Calendar.DAY_OF_MONTH)
+            synchronized(ElectricityAccessibilityService::class.java) {
+                val today = Calendar.getInstance()
+                if (today.get(Calendar.HOUR_OF_DAY) < 7) return@run  // 7点之前数据可能没有刷新，不统计
+                val year = today.get(Calendar.YEAR)
+                val month = today.get(Calendar.MONTH)
+                val day = today.get(Calendar.DAY_OF_MONTH)
 
-            val dao = App.getDB().electricityFeeDao
-            val feeOfToday = dao.getElectricityFeeByDaySync(year, month, day)
-            if (feeOfToday == null) { // 今天还没有统计过余额
-                val electricityFee = ElectricityFee()
-                electricityFee.year = year
-                electricityFee.month = month
-                electricityFee.day = day
-                electricityFee.balance = parseBalance
-                electricityFee.cost = 0.0
+                val dao = App.getDB().electricityFeeDao
+                val feeOfToday = dao.getElectricityFeeByDaySync(year, month, day)
+                if (feeOfToday == null) { // 今天还没有统计过余额
+                    val electricityFee = ElectricityFee()
+                    electricityFee.year = year
+                    electricityFee.month = month
+                    electricityFee.day = day
+                    electricityFee.balance = parseBalance
+                    electricityFee.cost = 0.0
 
-                val lastRecord = dao.lastElectricityFeeSync
-                if (lastRecord != null) { // 之前有统计过数据
-                    var chargeMoney = 0.0
-                    if (lastRecord.balance < parseBalance) { // 这段时间有充值
-                        val rechargeDao = App.getDB().rechargeDao
-                        val lastRecharge = rechargeDao.lastRechargeSync
-                        if (lastRecharge == null || !lastRecharge.inDate(lastRecord.getStartDate(), electricityFee.getEndDate())) {
-                            RxBus.getInstance().post(UnrecordRechargeEvent())
-                            return@run
-                        } else {
-                            chargeMoney = lastRecharge.charge
+                    val lastRecord = dao.lastElectricityFeeSync
+                    if (lastRecord != null) { // 之前有统计过数据
+                        var chargeMoney = 0.0
+                        if (lastRecord.balance < parseBalance) { // 这段时间有充值
+                            val rechargeDao = App.getDB().rechargeDao
+                            val lastRecharge = rechargeDao.lastRechargeSync
+                            if (lastRecharge == null || !lastRecharge.inDate(
+                                    lastRecord.getStartDate(),
+                                    electricityFee.getEndDate()
+                                )
+                            ) {
+                                RxBus.getInstance().post(UnrecordRechargeEvent())
+                                return@run
+                            } else {
+                                chargeMoney = lastRecharge.charge
+                            }
                         }
+                        val yesterday = today.yesterday()
+                        val yesterdayFee =
+                            dao.getElectricityFeeByDaySync(yesterday.year, yesterday.month, yesterday.day)
+                        if (yesterdayFee == null) { // 昨天没有统计过数据，需要补数据
+                            val lastRecordDay = Calendar.getInstance().also {
+                                it.year = lastRecord.year
+                                it.month = lastRecord.month
+                                it.day = lastRecord.day
+                            }
+                            val days = today - lastRecordDay
+                            val averageCost =
+                                ((lastRecord.balance + chargeMoney - electricityFee.balance) / days).roundHalfUp()
+                            val temp = today.clone() as Calendar
+                            for (i in 1 until days) { // 补数据
+                                temp.add(Calendar.DAY_OF_YEAR, -1)
+                                dao.insert(ElectricityFee().also {
+                                    it.year = temp.year
+                                    it.month = temp.month
+                                    it.day = temp.day
+                                    it.balance = (parseBalance + averageCost * i).roundHalfUp()
+                                    it.cost = averageCost
+                                    it.id = lastRecord.id + days - i
+                                })
+                            }
+                            electricityFee.id = lastRecord.id + days
+                            lastRecord.cost = averageCost
+                        } else { // 昨天统计过数据
+                            electricityFee.id = lastRecord.id + 1
+                            lastRecord.cost = (lastRecord.balance + chargeMoney - electricityFee.balance).roundHalfUp()
+                        }
+                        dao.update(lastRecord)
+                    } else { // 第一次统计到数据
+                        electricityFee.id = 1
                     }
-                    val yesterday = today.yesterday()
-                    val yesterdayFee = dao.getElectricityFeeByDaySync(yesterday.year, yesterday.month, yesterday.day)
-                    if (yesterdayFee == null) { // 昨天没有统计过数据，需要补数据
-                        val lastRecordDay = Calendar.getInstance().also {
-                            it.year = lastRecord.year
-                            it.month = lastRecord.month
-                            it.day = lastRecord.day
-                        }
-                        val days = today - lastRecordDay
-                        val averageCost = ((lastRecord.balance + chargeMoney - electricityFee.balance) / days).roundHalfUp()
-                        val temp = today.clone() as Calendar
-                        for (i in 1 until days) { // 补数据
-                            temp.add(Calendar.DAY_OF_YEAR, -1)
-                            dao.insert(ElectricityFee().also {
-                                it.year = temp.year
-                                it.month = temp.month
-                                it.day = temp.day
-                                it.balance = (parseBalance + averageCost * i).roundHalfUp()
-                                it.cost = averageCost
-                                it.id = lastRecord.id + days - i
-                            })
-                        }
-                        electricityFee.id = lastRecord.id + days
-                        lastRecord.cost = averageCost
-                    } else { // 昨天统计过数据
-                        electricityFee.id = lastRecord.id + 1
-                        lastRecord.cost = (lastRecord.balance + chargeMoney - electricityFee.balance).roundHalfUp()
-                    }
-                    dao.update(lastRecord)
-                } else { // 第一次统计到数据
-                    electricityFee.id = 1
+                    Logger.i(electricityFee.toString())
+                    dao.insert(electricityFee)
+                    RxBus.getInstance().post(BalanceEvent())
+                } else if (balance != java.lang.Double.toString(feeOfToday.balance)) { // 今天统计过余额，但是余额变动，可能是电力刷新时间有误
+
                 }
-                Logger.i(electricityFee.toString())
-                dao.insert(electricityFee)
-                RxBus.getInstance().post(BalanceEvent())
-            } else if (balance != java.lang.Double.toString(feeOfToday.balance)) { // 今天统计过余额，但是余额变动，可能是电力刷新时间有误
-
+                feeOfToday!!.balance = Util.roundDouble(parseBalance)
+                dao.update(feeOfToday)
             }
-            feeOfToday!!.balance = Util.roundDouble(parseBalance)
-            dao.update(feeOfToday)
         }
     }
 

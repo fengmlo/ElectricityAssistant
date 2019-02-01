@@ -4,4 +4,5 @@
     <item android:title="导入数据" android:id="@+id/item_import"/>
     <item android:title="导出到外部存储" android:id="@+id/item_export"/>
     <item android:title="记录充值" android:id="@+id/item_record_charge"/>
+    <item android:title="App列表" android:id="@+id/item_app_list"/>
 </menu>
