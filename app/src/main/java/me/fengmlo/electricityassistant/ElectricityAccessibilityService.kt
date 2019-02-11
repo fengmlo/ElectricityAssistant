@@ -102,7 +102,7 @@ class ElectricityAccessibilityService : AccessibilityService() {
                                     lastRecord.getStartDate(),
                                     electricityFee.getEndDate()
                                 )
-                            ) {
+                            ) { // 这段时间有充值，提示去记录充值
                                 RxBus.getInstance().post(UnrecordRechargeEvent())
                                 return@run
                             } else {
@@ -121,16 +121,15 @@ class ElectricityAccessibilityService : AccessibilityService() {
                             val days = today - lastRecordDay
                             val averageCost =
                                 ((lastRecord.balance + chargeMoney - electricityFee.balance) / days).roundHalfUp()
-                            val temp = today.clone() as Calendar
                             for (i in 1 until days) { // 补数据
-                                temp.add(Calendar.DAY_OF_YEAR, -1)
+                                lastRecordDay.add(Calendar.DAY_OF_YEAR, 1)
                                 dao.insert(ElectricityFee().also {
-                                    it.year = temp.year
-                                    it.month = temp.month
-                                    it.day = temp.day
-                                    it.balance = (parseBalance + averageCost * i).roundHalfUp()
+                                    it.year = lastRecordDay.year
+                                    it.month = lastRecordDay.month
+                                    it.day = lastRecordDay.day
+                                    it.balance = (lastRecord.balance - averageCost * i).roundHalfUp()
                                     it.cost = averageCost
-                                    it.id = lastRecord.id + days - i
+                                    it.id = lastRecord.id + i
                                 })
                             }
                             electricityFee.id = lastRecord.id + days
@@ -149,8 +148,8 @@ class ElectricityAccessibilityService : AccessibilityService() {
                 } else if (balance != java.lang.Double.toString(feeOfToday.balance)) { // 今天统计过余额，但是余额变动，可能是电力刷新时间有误
 
                 }
-                feeOfToday!!.balance = Util.roundDouble(parseBalance)
-                dao.update(feeOfToday)
+//                feeOfToday!!.balance = Util.roundDouble(parseBalance)
+//                dao.update(feeOfToday)
             }
         }
     }

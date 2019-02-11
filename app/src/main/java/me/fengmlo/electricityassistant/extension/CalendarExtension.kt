@@ -46,21 +46,21 @@ var Calendar.second
     }
 
 operator fun Calendar.minus(other: Calendar): Int {
-    var d1 = this.clone() as Calendar
-    var d2 = other.clone() as Calendar
-    if (d1.after(d2)) { // swap dates so that d1 is start and d2 is end
-        val swap = d1
-        d1 = d2
-        d2 = swap
+    var start = this.clone() as Calendar
+    var end = other.clone() as Calendar
+    if (start.after(end)) { // swap dates so that d1 is start and d2 is end
+        val swap = start
+        start = end
+        end = swap
     }
-    var days = d2.get(Calendar.DAY_OF_YEAR) - d1.get(Calendar.DAY_OF_YEAR)
-    val y2 = d2.get(Calendar.YEAR)
-    if (d1.year != y2) {
-        d1 = d1.clone() as Calendar
+    var days = end.get(Calendar.DAY_OF_YEAR) - start.get(Calendar.DAY_OF_YEAR)
+    val endYear = end.get(Calendar.YEAR)
+    if (start.year != endYear) {
+        start = start.clone() as Calendar
         do {
-            days += d1.getActualMaximum(Calendar.DAY_OF_YEAR)//得到当年的实际天数
-            d1.add(Calendar.YEAR, 1)
-        } while (d1.get(Calendar.YEAR) != y2)
+            days += start.getActualMaximum(Calendar.DAY_OF_YEAR)//得到当年的实际天数
+            start.add(Calendar.YEAR, 1)
+        } while (start.get(Calendar.YEAR) != endYear)
     }
-    return if (this.after(d2)) days else -days
+    return if (this.after(other)) days else -days
 }
