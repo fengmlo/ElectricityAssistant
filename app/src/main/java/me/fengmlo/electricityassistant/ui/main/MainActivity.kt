@@ -38,13 +38,16 @@ import me.fengmlo.electricityassistant.database.entity.ElectricityFee
 import me.fengmlo.electricityassistant.event.BalanceEvent
 import me.fengmlo.electricityassistant.event.RxBus
 import me.fengmlo.electricityassistant.event.UnrecordRechargeEvent
+import me.fengmlo.electricityassistant.extension.month
 import me.fengmlo.electricityassistant.extension.showToast
+import me.fengmlo.electricityassistant.extension.year
 import me.fengmlo.electricityassistant.ui.applist.AppListActivity
 import me.fengmlo.electricityassistant.util.ToastUtil
 import rx.Observable
 import rx.android.schedulers.AndroidSchedulers
 import rx.schedulers.Schedulers
 import java.io.InputStream
+import java.util.*
 
 const val APP_PACKAGE_NAME = "com.sgcc.cs" // 包名
 private const val FILE_SELECT_CODE = 1
@@ -62,12 +65,12 @@ class MainActivity : BaseActivity() {
     private var monthCost: Float = 0f
     private var monthCostDataSet: LineDataSet? = null
     private var monthBalanceDataSet: LineDataSet? = null
-    private var monthRechageDataSet: LineDataSet? = null
+    private var monthlyCostDataSet: LineDataSet? = null
 
     override fun getLayoutId(): Int = R.layout.activity_main
 
     override fun initView() {
-        tlSegment.setTabData(arrayOf("本月电费", "电费余额"))
+        tlSegment.setTabData(arrayOf("本月电费", "电费余额", "历史电费"))
         tlSegment.setOnTabSelectListener(object : OnTabSelectListener {
             override fun onTabSelect(position: Int) = reloadData(position)
             override fun onTabReselect(position: Int) {}
@@ -106,6 +109,7 @@ class MainActivity : BaseActivity() {
                         }
                     } ?: kotlin.run {
                         tvDate.visibility = View.INVISIBLE
+                        tvCost.text = e?.y.toString()
                     }
                 }
             })
@@ -143,6 +147,22 @@ class MainActivity : BaseActivity() {
                         initDataSetStyle()
                     }
             reloadData(tlSegment.currentTab)
+        })
+        model.getAllCost().observe(this, Observer { list ->
+            if (list.isNullOrEmpty()) {
+                loadEmptyData()
+                return@Observer
+            }
+            val today = Calendar.getInstance()
+            val data =
+                list.filter { it.year >= today.year - 1 && if (it.year == today.year - 1) it.month > today.month else true }
+                    .groupBy { it.month }.map {
+                        Entry(
+                            it.key.toFloat() + 1,
+                            (it.value.sumByDouble { it.cost }).toFloat()
+                        )
+                    }
+            monthlyCostDataSet = LineDataSet(data, null).apply { initDataSetStyle() }
         })
 
         val subscribe = RxBus.getInstance().toObservable(BalanceEvent::class.java)
@@ -264,6 +284,7 @@ class MainActivity : BaseActivity() {
     private fun loadEmptyData() {
         monthCostDataSet = LineDataSet(arrayListOf(Entry(0f, 0f)), null).apply { initDataSetStyle() }
         monthBalanceDataSet = LineDataSet(arrayListOf(Entry(0f, 0f)), null).apply { initDataSetStyle() }
+        monthlyCostDataSet = LineDataSet(arrayListOf(Entry(0f, 0f)), null).apply { initDataSetStyle() }
         reloadData(tlSegment.currentTab)
     }
 
@@ -271,6 +292,7 @@ class MainActivity : BaseActivity() {
         when (tab) {
             0 -> lcMonth.data = LineData(monthCostDataSet)
             1 -> lcMonth.data = LineData(monthBalanceDataSet)
+            2 -> lcMonth.data = LineData(monthlyCostDataSet)
         }
         lcMonth.invalidate()
         lcMonth.animateX(200)

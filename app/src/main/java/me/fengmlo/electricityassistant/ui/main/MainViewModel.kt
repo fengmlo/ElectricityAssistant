@@ -48,9 +48,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun importDatabase(inputStream: InputStream) {
         val reader = BufferedReader(InputStreamReader(inputStream))
         val electricityFee =
-                Gson().fromJson<List<ElectricityFee>>(reader.readLine(), object : TypeToken<List<ElectricityFee>>() {}.type)
+            Gson().fromJson<List<ElectricityFee>>(reader.readLine(), object : TypeToken<List<ElectricityFee>>() {}.type)
         val recharge =
-                Gson().fromJson<List<Recharge>>(reader.readLine(), object : TypeToken<List<Recharge>>() {}.type)
+            Gson().fromJson<List<Recharge>>(reader.readLine(), object : TypeToken<List<Recharge>>() {}.type)
         App.getDB().electricityFeeDao.insertAll(electricityFee)
         App.getDB().rechargeDao.insertAll(recharge)
     }
@@ -71,4 +71,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         rechargeDao.insert(newRecharge)
     }
+
+    fun getAllCost() = App.getDB().electricityFeeDao.loadAll()
+
 }
