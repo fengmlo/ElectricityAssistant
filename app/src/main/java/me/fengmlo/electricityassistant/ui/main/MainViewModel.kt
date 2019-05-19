@@ -1,8 +1,8 @@
 package me.fengmlo.electricityassistant.ui.main
 
 import android.app.Application
-import android.arch.lifecycle.AndroidViewModel
-import android.arch.lifecycle.LiveData
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LiveData
 import android.os.Environment
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken

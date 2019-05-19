@@ -8,7 +8,7 @@
     android:orientation="vertical"
     tools:context=".ui.main.MainActivity">
 
-    <android.support.constraint.ConstraintLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
@@ -60,7 +60,7 @@
             app:layout_constraintTop_toTopOf="parent"
             tools:text="11月10号" />
 
-    </android.support.constraint.ConstraintLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <com.flyco.tablayout.SegmentTabLayout
         android:id="@+id/tl_segment"

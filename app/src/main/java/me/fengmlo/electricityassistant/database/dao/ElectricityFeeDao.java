@@ -1,7 +1,7 @@
 package me.fengmlo.electricityassistant.database.dao;
 
-import android.arch.lifecycle.LiveData;
-import android.arch.persistence.room.*;
+import androidx.lifecycle.LiveData;
+import androidx.room.*;
 import me.fengmlo.electricityassistant.database.entity.ElectricityFee;
 
 import java.util.List;

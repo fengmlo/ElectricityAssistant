@@ -1,15 +1,15 @@
 package me.fengmlo.electricityassistant.ui.applist
 
-import android.arch.lifecycle.Observer
-import android.arch.lifecycle.ViewModelProviders
+import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProviders
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInfo
 import android.net.Uri
 import android.provider.Settings
-import android.support.v7.widget.DividerItemDecoration
-import android.support.v7.widget.LinearLayoutManager
-import android.support.v7.widget.RecyclerView
+import androidx.recyclerview.widget.DividerItemDecoration
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -26,7 +26,7 @@ import me.fengmlo.electricityassistant.bindView
 
 class AppListActivity : BaseActivity() {
 
-    private val rvAppList: RecyclerView by bindView(R.id.rv_app_list)
+    private val rvAppList: androidx.recyclerview.widget.RecyclerView by bindView(R.id.rv_app_list)
 
     private lateinit var model: AppListViewModel
     private val adapter = MultiTypeAdapter()
@@ -40,8 +40,13 @@ class AppListActivity : BaseActivity() {
         })
 
         rvAppList.adapter = adapter.apply { register(PackageInfo::class.java, AppBinder()) }
-        rvAppList.layoutManager = LinearLayoutManager(this)
-        rvAppList.addItemDecoration(DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
+        rvAppList.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+        rvAppList.addItemDecoration(
+            androidx.recyclerview.widget.DividerItemDecoration(
+                this,
+                androidx.recyclerview.widget.DividerItemDecoration.VERTICAL
+            )
+        )
     }
 
     private class AppBinder : ItemViewBinder<PackageInfo, AppHolder>() {
